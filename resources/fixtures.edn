@@ -1,0 +1,33 @@
+;; Biff transaction. See https://biffweb.com/docs/reference/transactions/
+[{:db/doc-type :user
+  :xt/id :db.id/user-a
+  :user/email "a@example.com"
+  :user/foo "Some Value"
+  :user/joined-at :db/now}
+ {:db/doc-type :msg
+  :msg/user :db.id/user-a
+  :msg/text "hello there"
+  :msg/sent-at :db/now}
+ {:db/doc-type :list
+  :xt/id :db.id/list-a
+  :list/title "List A"
+  :list/pos 0}
+ {:db/doc-type :list
+  :xt/id :db.id/list-b
+  :list/title "List B"
+  :list/pos 1}
+ {:db/doc-type :card
+  :xt/id :db.id/card-a
+  :card/title "Card A"
+  :card/list :db.id/list-a
+  :card/pos 0}
+ {:db/doc-type :card
+  :xt/id :db.id/card-b
+  :card/title "Card B"
+  :card/list :db.id/list-a
+  :card/pos 1}
+ {:db/doc-type :card
+  :xt/id :db.id/card-c
+  :card/title "Card C"
+  :card/list :db.id/list-b
+  :card/pos 0}]
