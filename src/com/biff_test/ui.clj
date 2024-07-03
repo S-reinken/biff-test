@@ -37,6 +37,7 @@
                                      [:script {:src "https://unpkg.com/htmx.org@1.9.12"}]
                                      [:script {:src "https://unpkg.com/htmx.org@1.9.12/dist/ext/ws.js"}]
                                      [:script {:src "https://unpkg.com/hyperscript.org@0.9.8"}]
+                                     [:script {:defer true :src "https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"}]
                                      [:script {:src "https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"}]
                                      [:script {:src (js-path)}]
                                      (when recaptcha

@@ -6,6 +6,7 @@
             [rum.core :as rum]
             [xtdb.api :as xt]
             [ring.adapter.jetty9 :as jetty]
+            [ring.middleware.anti-forgery :as anti-forgery]
             [cheshire.core :as cheshire]))
 
 (import java.util.UUID)
@@ -136,12 +137,44 @@
 (defn board [lists]
   [:div.flex.flex-row.gap-x-1#board
    (for [list (sort-by :list/pos lists)]
-     [:div.flex.flex-col.bg-gray-900.p-1.gap-y-1.w-32.sortable-list
-      {:uuid (:xt/id list)}
+     [:div.flex.flex-col.bg-gray-900.p-1.gap-y-1.w-32
+      {:x-init 
+       (str "new Sortable($el, 
+                { animation: 150,
+                  group: 'shared',
+                  onEnd: (evt) => {
+                    let destinationCards = Array.from(evt.to.children).map((child, index) => 
+                      ({
+                        title: child.getAttribute('title'),
+                        id: child.getAttribute('uuid'),
+                        position: index
+                      }));
+                    let sourceCards = Array.from(evt.from.children).map((child, index) => 
+                      ({
+                        title: child.getAttribute('title'),
+                        id: child.getAttribute('uuid'),
+                        position: index
+                      }));
+                    let sourceListId = evt.from.getAttribute('uuid');
+                    let destinationListId = evt.to.getAttribute('uuid');
+                    fetch(
+                      '/app/trello/move-card',
+                      {
+                        headers: { 'X-CSRF-Token': csrfToken,
+                                   'Content-Type': 'application/json' },
+                        method: 'POST',
+                        body: JSON.stringify({
+                          sourceListId: sourceListId,
+                          destinationListId: destinationListId,
+                          sourceCards: sourceCards,
+                          destinationCards: destinationCards
+                        })
+                      })
+                  }})")
+       :uuid (:xt/id list)}
       (:list/title list)
       (for [card-data (sort-by :card/pos (:card/_list list))]
         (card card-data))])])
-
 
 (defn trello-clone [{:keys [session biff/db] :as ctx}]
   (let [{:user/keys [email]} (xt/entity db (:uid session))
@@ -153,17 +186,10 @@
      [:div.flex.flex-col.items-left
       (nav-bar email)
       [:div "Here goes the trello clone"]
-      (biff/form
-       {:action "/app/trello/move-card"
-        :_ "on drop 
-            fetch '/app/trello/move-card'
-            with source-list-id=''
-                 destination-list-id=''
-                 source-cards=JSON.stringify([...source.children].map(e => ({id: e.getAttribute('uuid'), title: e.getAttribute('title'), position: e.style.order})))
-                 destination-cards=JSON.stringify([...destination.children].map(e => ({id: e.getAttribute('uuid'), title: e.getAttribute('title'), position: e.style.order})))"}
-       [:div.flex.flex-col#board-container
-        {:hx-ext "ws" :ws-connect "/app/trello/trello-board"}
-        (board lists)])])))
+      [:div.flex.flex-col#board-container
+       {:hx-ext "ws" :ws-connect "/app/trello/trello-board"
+        :x-data (str "{csrfToken: '" anti-forgery/*anti-forgery-token* "' }")}
+       (board lists)]])))
 
 (defn other-stuff [{:keys [session biff/db] :as ctx}]
   (let [{:user/keys [email]} (xt/entity db (:uid session))]
@@ -219,30 +245,33 @@
           ws @chat-clients]
     (jetty/send! ws html)))
 
+(defn print-ret [val]
+  (println val)
+  val)
+
 (defn move-card [{:keys [params] :as ctx}]
-  (biff/fix-print (println "Moving card"))
-  (let [{:keys [source-list-id
-                destination-list-id
-                source-cards
-                destination-cards]} params
-        source-card-data (cheshire/parse-string source-cards true)
-        destination-card-data (cheshire/parse-string destination-cards true)]
+  (def *ctx ctx)
+  (biff/fix-print (println (str "Moving card: " params)))
+  (let [{:keys [sourceListId
+                destinationListId
+                sourceCards
+                destinationCards]} params]
     (biff/submit-tx
      ctx
      (concat
-      (for [card-data source-card-data]
+      (for [card-data sourceCards]
         {:db/doc-type :card
          :xt/id (UUID/fromString (:id card-data))
-         :card/list (UUID/fromString source-list-id)
+         :card/list (UUID/fromString sourceListId)
          :card/pos (:position card-data)
          :card/title (:title card-data)})
-      (for [card-data destination-card-data]
+      (for [card-data destinationCards]
         {:db/doc-type :card
          :xt/id (UUID/fromString (:id card-data))
-         :card/list (UUID/fromString destination-list-id)
+         :card/list (UUID/fromString destinationListId)
          :card/pos (:position card-data)
          :card/title (:title card-data)}))))
-  {:status 200})
+  {:status 204})
 
 (def about-page
   (ui/page
@@ -269,3 +298,7 @@
             ["/chat" {:get ws-handler}]]
    :api-routes [["/api/echo" {:post echo}]]
    :on-tx notify-clients})
+
+(comment
+  
+  (:body *ctx))
